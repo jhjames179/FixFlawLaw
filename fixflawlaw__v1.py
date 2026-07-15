@@ -3132,7 +3132,6 @@ def render_sequential_asset():
                             },
                             {"role": "user", "content": independent_prompt},
                         ],
-                        temperature=0.2,
                     )
                     st.session_state.asset_report = _sanitize_asset_report(
                         response.choices[0].message.content
@@ -3401,7 +3400,6 @@ def render_sequential_diagnosis():
                             {"role": "system", "content": "당신은 가독성 높고 정제된 법률 실무 서식 형태로 답변하는 AI 전문 윤리 검토관입니다."},
                             {"role": "user", "content": prompt_content},
                         ],
-                        temperature=0.2,
                     )
                     st.session_state.diagnosis_llm_report = response.choices[0].message.content
                 except Exception as e:
