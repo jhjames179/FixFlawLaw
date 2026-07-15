@@ -1,0 +1,24 @@
+# Secrets & local env
+key.env
+.env
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.pyc
+*.py[cod]
+.venv/
+venv/
+
+# Local runtime data
+fixflawlaw_records.json
+_font_test.pdf
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Cursor agent skill cache (not needed for deployment)
+.agents/
