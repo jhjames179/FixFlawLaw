@@ -1227,8 +1227,11 @@ st.markdown(
 
         /* ── 툴팁 최종 우선순위 (전역 텍스트 규칙 덮어쓰기) ── */
         body [data-testid="stTooltipContent"],
-        body [data-testid="stTooltipContent"] p,
-        body [data-testid="stTooltipContent"] span {
+        body [data-testid="stTooltipContent"] *,
+        body div[role="tooltip"],
+        body div[role="tooltip"] *,
+        body div[data-baseweb="tooltip"],
+        body div[data-baseweb="tooltip"] * {
             color: #FFFFFF !important;
             -webkit-text-fill-color: #FFFFFF !important;
         }
@@ -3202,11 +3205,10 @@ def render_sequential_asset():
             1. 법령명, 조문 번호(제○조), 시행령·별표 인용을 절대 나열하지 마세요.
             2. "○○법 제○조에 따르면" 같은 법 조항 인용 문장을 사용하지 마세요.
             3. 일반인이 이해할 수 있는 실무 언어로 리스크와 개선안만 작성하세요.
-            4. 전체 분량은 한글 600~900자 이내로 간결하게 작성하세요.
-            5. 각 항목은 핵심 문장 또는 불릿 2개 이내로 제한하세요.
-            6. 예시, 사례, 가정 상황, 장황한 배경 설명은 생략하세요.
-            7. 법적 근거는 화면의 물음표 도움말에 표시되므로 본문에는 조문명·조문번호를 쓰지 마세요.
-            8. 아래 형식을 정확히 따르세요:
+            4. 예시, 사례, 가정 상황은 생략하고 핵심 판단과 조치 위주로 작성하세요.
+            5. 법적 근거는 화면의 물음표 도움말에 표시되므로 본문에는 조문명·조문번호를 쓰지 마세요.
+            6. 각 항목은 불릿과 볼드체를 활용해 충분히 상세하게 작성하세요.
+            7. 아래 형식을 정확히 따르세요:
                ## 분석 개요
                ## 주요 리스크
                ## 개선 권고 사항
@@ -3227,7 +3229,6 @@ def render_sequential_asset():
                             {"role": "user", "content": independent_prompt},
                         ],
                         reasoning_effort="low",
-                        max_completion_tokens=900,
                     )
                     st.session_state.asset_report = _sanitize_core_report(
                         response.choices[0].message.content
@@ -3504,16 +3505,16 @@ def render_sequential_diagnosis():
             - 생성형 AI 여부: {is_generative} | 사전고지 상태: {user_notify} | AI 표시 여부: {ai_marking}
             - 데이터 수집 출처: {", ".join(data_sources)} | 연산량 규모: {heavy_compute} | 기술적 설명력: {explainable}
             [준거 지식 베이스]
-            {txt_knowledge_base[:2500]}
+            {txt_knowledge_base[:4500]}
             [출력 스타일 규칙 - 엄격 준수]
-            1. 전체 분량은 한글 700~1,000자 이내로 제한할 것.
+            1. 가독성을 최대로 고려하여 볼드체(**)와 구조화된 불릿 위주로 체계적으로 분할할 것.
             2. 아래 4개 제목만 `##` 형식으로 사용할 것.
                ## 진단 요약
                ## 우선 조치
                ## 운영 가이드
                ## 재점검 기준
-            3. 각 제목 아래에는 핵심 불릿을 2개 이내로 작성할 것.
-            4. 예시, 사례, 가정 상황, 장황한 배경 설명은 생략할 것.
+            3. 각 제목 아래에는 서비스 특성에 맞춘 구체적 판단과 조치를 충분히 상세하게 작성할 것.
+            4. 예시, 사례, 가정 상황은 생략하고 실제 입력 데이터 기반 판단만 작성할 것.
             5. 법적 근거는 화면의 물음표 도움말에 표시되므로 본문에는 조문명·조문번호를 쓰지 말 것.
             6. 중복 설명, 긴 법령 원문, 과도한 이모티콘은 제외할 것.
             """
@@ -3526,7 +3527,6 @@ def render_sequential_diagnosis():
                             {"role": "user", "content": prompt_content},
                         ],
                         reasoning_effort="low",
-                        max_completion_tokens=1100,
                     )
                     st.session_state.diagnosis_llm_report = _sanitize_core_report(response.choices[0].message.content)
                 except Exception as e:
