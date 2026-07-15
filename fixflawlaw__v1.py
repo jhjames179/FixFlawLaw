@@ -446,8 +446,8 @@ st.markdown(
         .stTabs [data-baseweb="tab-highlight"] { background: var(--blue) !important; height: 3px !important; }
         .stTabs [data-baseweb="tab-panel"] { background: transparent; padding-top: 1.5rem; }
 
-        /* ── 버튼 ── */
-        div.stButton > button, div.stFormSubmitButton > button, div[data-testid="stDownloadButton"] > button {
+        /* ── 버튼 (help 툴팁 래퍼 포함 모든 중첩 구조 대응) ── */
+        div.stButton button, div.stFormSubmitButton button, div[data-testid="stDownloadButton"] button {
             background: var(--blue) !important; color: #FFFFFF !important;
             border-radius: 999px !important; border: none !important;
             padding: 0.7rem 1.75rem !important;
@@ -456,7 +456,7 @@ st.markdown(
             font-weight: 600;
             box-shadow: 0 2px 8px rgba(37,99,235,0.25);
         }
-        div.stButton > button:hover, div.stFormSubmitButton > button:hover {
+        div.stButton button:hover, div.stFormSubmitButton button:hover {
             background: var(--blue-dark) !important;
         }
 
@@ -1199,12 +1199,12 @@ st.markdown(
         }
 
         /* ── 진한 배경 위 흰색 텍스트 ── */
-        div.stButton > button,
-        div.stButton > button *,
-        div.stFormSubmitButton > button,
-        div.stFormSubmitButton > button *,
-        div[data-testid="stDownloadButton"] > button,
-        div[data-testid="stDownloadButton"] > button *,
+        div.stButton button,
+        div.stButton button *,
+        div.stFormSubmitButton button,
+        div.stFormSubmitButton button *,
+        div[data-testid="stDownloadButton"] button,
+        div[data-testid="stDownloadButton"] button *,
         div[data-testid="stFileUploader"] button,
         div[data-testid="stFileUploader"] button *,
         .stTabs [aria-selected="true"],
@@ -1215,9 +1215,9 @@ st.markdown(
         div[aria-selected="true"][role="option"] * {
             color: #FFFFFF !important;
         }
-        div.stButton > button svg,
-        div.stFormSubmitButton > button svg,
-        div[data-testid="stDownloadButton"] > button svg,
+        div.stButton button svg,
+        div.stFormSubmitButton button svg,
+        div[data-testid="stDownloadButton"] button svg,
         div[data-testid="stFileUploader"] button svg,
         .stTabs [aria-selected="true"] svg,
         div[data-baseweb="tag"] svg {
@@ -1300,7 +1300,7 @@ st.markdown(
         /* 초소형 화면 */
         @media (max-width: 480px) {
             .hero-sub { font-size: 0.9rem; }
-            div.stButton > button, div.stFormSubmitButton > button {
+            div.stButton button, div.stFormSubmitButton button {
                 padding: 0.65rem 1.1rem !important;
                 font-size: 0.9rem !important;
             }
