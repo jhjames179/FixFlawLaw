@@ -1904,6 +1904,62 @@ def _sanitize_asset_report(text: str) -> str:
     return cleaned.strip()
 
 
+def _sanitize_core_report(text: str) -> str:
+    """분석 본문에서 예시·조문 인용을 제거해 핵심 판단만 남깁니다."""
+    if not text:
+        return ""
+    cleaned = _sanitize_asset_report(text)
+    patterns = [
+        r"(?im)^\s*(예시|예:|예를\s*들어|사례)\s*[:：]?.*$",
+        r"(?im)^\s*(법적\s*근거|관련\s*근거|근거\s*조항)\s*[:：].*$",
+        r"\([^\)]*제\s*\d+조[^\)]*\)",
+        r"\[[^\]]*제\s*\d+조[^\]]*\]",
+    ]
+    for pattern in patterns:
+        cleaned = re.sub(pattern, "", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
+DIAGNOSIS_SECTION_HELP = {
+    "진단 요약": "인공지능 기본법 제3조(기본원칙), 제31조(투명성 의무), 제33조·제34조(고영향 AI 확인 및 안전성·신뢰성 확보)를 기준으로 종합 판단합니다.",
+    "우선 조치": "인공지능 기본법 제31조(사전고지·생성물 표시·가상 결과물 표시), 제32조(안전성 확보), 제34조(고영향 AI 조치)를 근거로 긴급 개선 항목을 정합니다.",
+    "운영 가이드": "인공지능 기본법 제3조(설명 제공 권리), 제15조(학습용데이터 관리), 개인정보보호법상 적법 수집·이용 원칙을 운영 기준으로 반영합니다.",
+    "재점검 기준": "인공지능 기본법 제40조(자료 제출·사실조사 및 시정명령), 제43조(과태료)를 고려해 변경·배포 전 점검 기준을 제시합니다.",
+}
+
+
+ASSET_SECTION_HELP = {
+    "분석 개요": "인공지능 기본법 제31조의 생성형 AI 사전고지·표시 의무와 이용자 오인 방지 관점에서 산출물 성격을 요약합니다.",
+    "주요 리스크": "인공지능 기본법 제31조 제2항·제3항의 생성물 표시 및 가상 결과물 인식 조치, 딥페이크·오인 가능성을 기준으로 판단합니다.",
+    "개선 권고 사항": "인공지능 기본법 제31조의 투명성 의무 이행을 위해 표시, 워터마크, 안내문구, 배포 전 확인 조치를 권고합니다.",
+    "종합 의견": "인공지능 기본법 제3조의 신뢰성 원칙과 제31조의 투명성 의무를 바탕으로 배포 가능성과 보완 우선순위를 정리합니다.",
+}
+
+
+def _render_report_sections(report: str, section_help: dict[str, str]):
+    """Markdown 보고서의 제목을 Streamlit 제목+? 도움말로 렌더링합니다."""
+    report = _sanitize_core_report(report)
+    if not report:
+        st.info("분석 결과가 없습니다.")
+        return
+    parts = re.split(r"(?m)^##\s+(.+?)\s*$", report)
+    if len(parts) == 1:
+        st.markdown(report)
+        return
+
+    preamble = parts[0].strip()
+    if preamble:
+        st.markdown(preamble)
+    for idx in range(1, len(parts), 2):
+        title = parts[idx].strip().strip("*")
+        body = parts[idx + 1].strip() if idx + 1 < len(parts) else ""
+        help_text = next((help_msg for key, help_msg in section_help.items() if key in title), None)
+        st.subheader(title, help=help_text)
+        if body:
+            st.markdown(body)
+
+
 def _save_asset_history(media_choice: str, resource_label: str, analysis: str):
     token = st.session_state.get("asset_run_token")
     if not token or st.session_state.get("last_saved_asset_token") == token:
@@ -3028,13 +3084,19 @@ def render_mypage():
             st.rerun()
 
 
-def _wizard_nav(prev_step: int | None, next_label: str, next_key: str, next_step: int):
+def _wizard_nav(
+    prev_step: int | None,
+    next_label: str,
+    next_key: str,
+    next_step: int,
+    next_help: str | None = None,
+):
     c1, c2 = st.columns(2)
     with c1:
         if prev_step is not None and st.button("← 이전 단계", key=f"{next_key}_prev"):
             return prev_step
     with c2:
-        if st.button(next_label, key=next_key, type="primary"):
+        if st.button(next_label, key=next_key, type="primary", help=next_help):
             return next_step
     return None
 
@@ -3054,14 +3116,33 @@ def render_sequential_asset():
             "분석하려는 가상 자원 종류",
             ["이미지 파일 업로드 검증", "동영상 파일 업로드 검증", "웹사이트 배포 URL 검증"],
             key="asset_media_choice",
+            help=(
+                "이미지·동영상은 AI 생성 표시와 오인 가능성을, URL은 공개 화면의 "
+                "고지·표시 상태를 중심으로 점검합니다."
+            ),
         )
         uploaded_file, target_url = None, ""
         if media_choice == "이미지 파일 업로드 검증":
-            uploaded_file = st.file_uploader("AI 생성 이미지 (.png, .jpg)", type=["png", "jpg", "jpeg"], key="asset_img")
+            uploaded_file = st.file_uploader(
+                "AI 생성 이미지 (.png, .jpg)",
+                type=["png", "jpg", "jpeg"],
+                key="asset_img",
+                help="AI 생성 이미지의 표시·워터마크·오인 가능성을 검토합니다.",
+            )
         elif media_choice == "동영상 파일 업로드 검증":
-            uploaded_file = st.file_uploader("AI 생성 동영상 (.mp4)", type=["mp4"], key="asset_vid")
+            uploaded_file = st.file_uploader(
+                "AI 생성 동영상 (.mp4)",
+                type=["mp4"],
+                key="asset_vid",
+                help="AI 생성 동영상의 딥페이크·오인·유포 위험을 검토합니다.",
+            )
         else:
-            target_url = st.text_input("배포 URL", value=st.session_state.get("asset_target_url", "https://"), key="asset_url")
+            target_url = st.text_input(
+                "배포 URL",
+                value=st.session_state.get("asset_target_url", "https://"),
+                key="asset_url",
+                help="공개 접속 가능한 URL에서 AI 사용 고지와 생성물 표시 상태를 점검합니다.",
+            )
 
         if st.button("다음 단계 →", key="asset_next_0", type="primary"):
             if media_choice == "웹사이트 배포 URL 검증":
@@ -3088,7 +3169,16 @@ def render_sequential_asset():
         st.info(f"**선택된 자원** · {media_choice}\n\n`{resource_label}`")
         st.markdown("선택한 산출물에 대해 컴플라이언스 관점의 스크리닝을 실행합니다.")
 
-        nav = _wizard_nav(0, "⚖️ 스크리닝 실행", "asset_run", 2)
+        nav = _wizard_nav(
+            0,
+            "⚖️ 스크리닝 실행",
+            "asset_run",
+            2,
+            next_help=(
+                "투명성, 표시·워터마크, 딥페이크·오인·유포 위험과 즉시 개선 조치를 "
+                "짧은 보고서로 생성합니다."
+            ),
+        )
         if nav == 0:
             st.session_state.asset_step = 0
             st.rerun()
@@ -3112,7 +3202,11 @@ def render_sequential_asset():
             1. 법령명, 조문 번호(제○조), 시행령·별표 인용을 절대 나열하지 마세요.
             2. "○○법 제○조에 따르면" 같은 법 조항 인용 문장을 사용하지 마세요.
             3. 일반인이 이해할 수 있는 실무 언어로 리스크와 개선안만 작성하세요.
-            4. 아래 형식을 따르세요:
+            4. 전체 분량은 한글 600~900자 이내로 간결하게 작성하세요.
+            5. 각 항목은 핵심 문장 또는 불릿 2개 이내로 제한하세요.
+            6. 예시, 사례, 가정 상황, 장황한 배경 설명은 생략하세요.
+            7. 법적 근거는 화면의 물음표 도움말에 표시되므로 본문에는 조문명·조문번호를 쓰지 마세요.
+            8. 아래 형식을 정확히 따르세요:
                ## 분석 개요
                ## 주요 리스크
                ## 개선 권고 사항
@@ -3132,8 +3226,10 @@ def render_sequential_asset():
                             },
                             {"role": "user", "content": independent_prompt},
                         ],
+                        reasoning_effort="low",
+                        max_completion_tokens=900,
                     )
-                    st.session_state.asset_report = _sanitize_asset_report(
+                    st.session_state.asset_report = _sanitize_core_report(
                         response.choices[0].message.content
                     )
                     st.session_state.asset_step = 2
@@ -3147,8 +3243,14 @@ def render_sequential_asset():
         resource_label = st.session_state.get("asset_file_name") or st.session_state.get("asset_target_url", "")
         _save_asset_history(media_choice, resource_label, report)
 
-        st.markdown("### 📋 AI 산출물 컴플라이언스 분석서")
-        st.markdown(report)
+        st.subheader(
+            "AI 산출물 컴플라이언스 분석서",
+            help=(
+                "업로드한 산출물의 AI 생성 표시, 투명성, 오인·딥페이크·유포 위험을 "
+                "실무 관점에서 요약한 결과입니다."
+            ),
+        )
+        _render_report_sections(report, ASSET_SECTION_HELP)
         if st.button("🔄 처음부터 다시 분석", key="asset_restart"):
             for key in (
                 "asset_step", "asset_media_choice", "asset_file_name",
@@ -3294,7 +3396,16 @@ def render_sequential_diagnosis():
             help="[인공지능 기본법 제31조 제3항·제4항] 이용자 인식 조치 의무입니다.",
         )
         st.session_state.diagnosis_form = form
-        nav = _wizard_nav(1, "⚖️ 비즈니스 컴플라이언스 위험도 진단 실행", "diag_run", 3)
+        nav = _wizard_nav(
+            1,
+            "⚖️ 비즈니스 컴플라이언스 위험도 진단 실행",
+            "diag_run",
+            3,
+            next_help=(
+                "입력한 서비스 정보를 기준으로 법률 준수, 윤리, 위험 요소와 맞춤 개선 "
+                "가이드라인을 짧은 보고서로 생성합니다."
+            ),
+        )
         if nav == 1:
             st.session_state.diagnosis_step = 1
             st.rerun()
@@ -3378,19 +3489,33 @@ def render_sequential_diagnosis():
         if company_size == "중소기업 (스타트업 포함)":
             st.info("💡 [중소기업 우선지원 특례] 법 제17조·제30조에 따른 지원 자격이 있을 수 있습니다.")
 
-        st.subheader("🤖 [F-02] 윤리 원칙 및 맞춤 가이드라인 정성 분석")
+        st.subheader(
+            "🤖 [F-02] 윤리 원칙 및 맞춤 가이드라인 정성 분석",
+            help=(
+                "입력한 서비스 특성과 진단 점수를 바탕으로 우선 조치, 운영 기준, "
+                "점검 주기를 간결하게 제안합니다."
+            ),
+        )
         if "diagnosis_llm_report" not in st.session_state:
             prompt_content = f"""
-            당신은 대한민국 인공지능 기본법 및 책임 있는 AI 윤리 전문가입니다. 아래 속성을 분석하여 공식 보고서 서식으로 답변해 주세요.
+            당신은 대한민국 인공지능 기본법 및 책임 있는 AI 윤리 전문가입니다. 아래 속성을 분석하여 간결한 실무 보고서로 답변해 주세요.
             [입력 데이터]
             - 서비스명: {service_name} | 규모: {company_size} | 도메인: {high_impact_domain}
             - 생성형 AI 여부: {is_generative} | 사전고지 상태: {user_notify} | AI 표시 여부: {ai_marking}
             - 데이터 수집 출처: {", ".join(data_sources)} | 연산량 규모: {heavy_compute} | 기술적 설명력: {explainable}
             [준거 지식 베이스]
-            {txt_knowledge_base[:4500]}
+            {txt_knowledge_base[:2500]}
             [출력 스타일 규칙 - 엄격 준수]
-            1. 가독성을 최대로 고려하여 볼드체(**)와 구조화된 번호 매기기(1., 2., 3.) 위주로 체계적으로 분할할 것.
-            2. 과도하고 산만한 이모티콘 사용을 철저히 금지하고 문단 구분선과 명확한 타이틀 구조를 지킬 것.
+            1. 전체 분량은 한글 700~1,000자 이내로 제한할 것.
+            2. 아래 4개 제목만 `##` 형식으로 사용할 것.
+               ## 진단 요약
+               ## 우선 조치
+               ## 운영 가이드
+               ## 재점검 기준
+            3. 각 제목 아래에는 핵심 불릿을 2개 이내로 작성할 것.
+            4. 예시, 사례, 가정 상황, 장황한 배경 설명은 생략할 것.
+            5. 법적 근거는 화면의 물음표 도움말에 표시되므로 본문에는 조문명·조문번호를 쓰지 말 것.
+            6. 중복 설명, 긴 법령 원문, 과도한 이모티콘은 제외할 것.
             """
             with st.spinner("AI가 맞춤 가이드라인을 제작 중입니다..."):
                 try:
@@ -3400,12 +3525,14 @@ def render_sequential_diagnosis():
                             {"role": "system", "content": "당신은 가독성 높고 정제된 법률 실무 서식 형태로 답변하는 AI 전문 윤리 검토관입니다."},
                             {"role": "user", "content": prompt_content},
                         ],
+                        reasoning_effort="low",
+                        max_completion_tokens=1100,
                     )
-                    st.session_state.diagnosis_llm_report = response.choices[0].message.content
+                    st.session_state.diagnosis_llm_report = _sanitize_core_report(response.choices[0].message.content)
                 except Exception as e:
                     st.session_state.diagnosis_llm_report = f"LLM 분석 실패: {e}"
         _save_diagnosis_history(form, result, st.session_state.diagnosis_llm_report)
-        st.markdown(st.session_state.diagnosis_llm_report)
+        _render_report_sections(st.session_state.diagnosis_llm_report, DIAGNOSIS_SECTION_HELP)
 
         if st.button("🔄 처음부터 다시 진단", key="diag_restart"):
             st.session_state.diagnosis_step = 0
